@@ -394,14 +394,30 @@ canvas#c { display:block; cursor:crosshair; }
             <input class="ep-inp red" id="enEndLon" type="number" placeholder="°E" step="0.1" value="76.0">
         </div>
         <div class="endpoint-row">
+            <span class="ep-lbl" style="color:#dd0033;">〜 TRAJ</span>
+            <select id="enTraj" style="padding:3px 6px;background:#02030a;border:1px solid #dd003344;color:#ff4466;font-family:'Courier New',monospace;font-size:10px;border-radius:3px;">
+                <option value="straight">Straight</option>
+                <option value="scurve">S-Curve</option>
+                <option value="inbound">Inbound Arc</option>
+                <option value="outbound">Outbound Arc</option>
+            </select>
+        </div>
+        <div class="endpoint-row">
+            <span class="ep-lbl" style="color:#dd0033;">〜 TRAJ</span>
+            <select id="enTraj" style="padding:3px 6px;background:#02030a;border:1px solid #dd003344;color:#ff4466;font-family:'Courier New',monospace;font-size:10px;border-radius:3px;">
+                <option value="straight">Straight</option>
+                <option value="scurve">S-Curve</option>
+                <option value="inbound">Inbound Arc</option>
+                <option value="outbound">Outbound Arc</option>
+            </select>
+        </div>
+        <div class="endpoint-row">
             <span class="ep-lbl" style="color:#dd0033;">⚡ SPEED</span>
             <input class="ep-inp red" id="enRealSpd" type="number" placeholder="km/h" step="10" value="400" style="width:80px;">
             <span class="ep-lbl">km/h</span>
             <button class="ep-btn red" onclick="armMission('en')">▶ ARM</button>
             <button class="ep-btn clr" onclick="resetMission('en')">↺ RESET</button>
         </div>
-        <div class="dist-to-end" id="enMissionInfo">Set START, END, SPEED then press ARM.</div>
-    </div>
 
     <!-- MUTUAL STATS -->
     <div class="stats-block threat-block">
