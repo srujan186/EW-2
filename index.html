@@ -1312,6 +1312,64 @@ function fmtTime(seconds) {
 // For short distances the simple approximation is accurate enough:
 // dLat and dLon in degrees → convert to km using KM_DEG (111 km/deg).
 // The cos(lat) factor corrects longitude km for the earth's curvature.
+
+// ── Trajectory interpolation functions (lat/lon space) ──
+function trajLerp(sLat,sLon,eLat,eLon,t){
+    return { lat:sLat+t*(eLat-sLat), lon:sLon+t*(eLon-sLon) };
+}
+function trajSCurve(sLat,sLon,eLat,eLon,t){
+    // Perpendicular offset at midpoint for S-shape
+    const mLat=(sLat+eLat)/2, mLon=(sLon+eLon)/2;
+    const dLat=eLat-sLat, dLon=eLon-sLon;
+    const pLat=-dLon*0.4, pLon=dLat*0.4; // perpendicular
+    if(t<=0.5){
+        const lt=t*2;
+        // s→mid+perp (cubic ease)
+        const u=1-lt;
+        const c1Lat=sLat+pLat, c1Lon=sLon+pLon;
+        const c2Lat=mLat+pLat, c2Lon=mLon+pLon;
+        return {
+            lat:u*u*u*sLat+3*u*u*lt*c1Lat+3*u*lt*lt*c2Lat+lt*lt*lt*mLat,
+            lon:u*u*u*sLon+3*u*u*lt*c1Lon+3*u*lt*lt*c2Lon+lt*lt*lt*mLon
+        };
+    } else {
+        const lt=(t-0.5)*2;
+        const u=1-lt;
+        const c1Lat=mLat-pLat, c1Lon=mLon-pLon;
+        const c2Lat=eLat-pLat, c2Lon=eLon-pLon;
+        return {
+            lat:u*u*u*mLat+3*u*u*lt*c1Lat+3*u*lt*lt*c2Lat+lt*lt*lt*eLat,
+            lon:u*u*u*mLon+3*u*u*lt*c1Lon+3*u*lt*lt*c2Lon+lt*lt*lt*eLon
+        };
+    }
+}
+function trajInbound(sLat,sLon,eLat,eLon,t){
+    // Arc curving toward the midpoint (bows inward toward centre of map)
+    const mLat=(sLat+eLat)/2, mLon=(sLon+eLon)/2;
+    const dLat=eLat-sLat, dLon=eLon-sLon;
+    // ctrl point pushed toward centre (subtract half the span)
+    const ctrlLat=mLat-dLat*0.4, ctrlLon=mLon-dLon*0.4;
+    const u=1-t;
+    return { lat:u*u*sLat+2*u*t*ctrlLat+t*t*eLat, lon:u*u*sLon+2*u*t*ctrlLon+t*t*eLon };
+}
+function trajOutbound(sLat,sLon,eLat,eLon,t){
+    // Arc curving away from midpoint (bows outward)
+    const mLat=(sLat+eLat)/2, mLon=(sLon+eLon)/2;
+    const dLat=eLat-sLat, dLon=eLon-sLon;
+    const ctrlLat=mLat+dLat*0.4, ctrlLon=mLon+dLon*0.4;
+    const u=1-t;
+    return { lat:u*u*sLat+2*u*t*ctrlLat+t*t*eLat, lon:u*u*sLon+2*u*t*ctrlLon+t*t*eLon };
+}
+function getTrajPos(traj, sLat,sLon,eLat,eLon, t){
+    switch(traj){
+        case 'scurve':   return trajSCurve(sLat,sLon,eLat,eLon,t);
+        case 'inbound':  return trajInbound(sLat,sLon,eLat,eLon,t);
+        case 'outbound': return trajOutbound(sLat,sLon,eLat,eLon,t);
+        default:         return trajLerp(sLat,sLon,eLat,eLon,t);
+    }
+}
+
+
 function deltaKm(lat1, lon1, lat2, lon2) {
     const dLatKm = (lat2 - lat1) * KM_DEG;
     const dLonKm = (lon2 - lon1) * KM_DEG * Math.cos(d2r((lat1+lat2)/2));
