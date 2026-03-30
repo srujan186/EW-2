@@ -836,8 +836,9 @@ function updateThreats() {
             return;
         }
 
-        th.lat = th.startLat + th._t * (th.endLat - th.startLat);
-        th.lon = th.startLon + th._t * (th.endLon - th.startLon);
+        const tpos = getTrajPos(th.trajectory||'straight', th.startLat,th.startLon,th.endLat,th.endLon, th._t);
+        th.lat = tpos.lat;
+        th.lon = tpos.lon;
 
         const cp = llToPx(th.lat, th.lon);
         th._pos = { x:cp.x, y:cp.y, lat:th.lat, lon:th.lon };
@@ -1474,8 +1475,9 @@ function stepMission(who) {
         return;
     }
 
-    ac.lat = m.startLat + m._t*(m.endLat - m.startLat);
-    ac.lon = m.startLon + m._t*(m.endLon - m.startLon);
+    const pos = getTrajPos(m.trajectory||'straight', m.startLat,m.startLon,m.endLat,m.endLon, m._t);
+    ac.lat = pos.lat;
+    ac.lon = pos.lon;
     ac.moving = true;
     m.travelledKm = m._t * m.totalDistKm;
 
