@@ -665,6 +665,14 @@ function createThreatUI() {
             <span class="badge ${th.motionMode==='static'?'badge-static':'badge-dynamic'}" id="mb-${i}">${th.motionMode==='static'?'◉ STATIC':'▶ DYNAMIC'}</span>
         </div>
         <div class="dynamic-opts ${th.motionMode==='dynamic'?'show':''}" id="do-${i}">
+        <div class="control-group"><label>TRAJECTORY</label>
+                <select onchange="setTF(${i},'trajectory',this.value)" style="width:100%;">
+                    <option value="straight">Straight</option>
+                    <option value="scurve">S-Curve</option>
+                    <option value="inbound">Inbound Arc</option>
+                    <option value="outbound">Outbound Arc</option>
+                </select>
+            </div>
             <div class="traj-sub" style="color:#ffaa00;">▶ START LAT / LON</div>
             <div class="row2">
                 <div class="control-group"><label>LAT (°N)</label>
@@ -1424,6 +1432,7 @@ function armMission(who) {
         alert('Fill in valid START, END and SPEED (km/h > 0)'); return;
     }
     m.startLat=sLat; m.startLon=sLon; m.endLat=eLat; m.endLon=eLon; m.speedKmh=spd;
+    m.trajectory = document.getElementById(who+'Traj').value;
     m.totalDistKm  = deltaKm(sLat,sLon,eLat,eLon);
     // Real-world duration in seconds: dist/speed_in_km_per_sec
     m.totalRealSec = m.totalDistKm / (spd / 3600);
