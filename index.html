@@ -175,7 +175,7 @@ canvas#c { display:block; cursor:crosshair; }
     color:#cc88ff; margin-bottom:8px; padding-bottom:5px;
     border-bottom:1px solid #1a0a2e;
 }
-.power-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; }
+.power-grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:6px; }
 .power-cell { display:flex; flex-direction:column; gap:2px; }
 .power-lbl  { color:#2a1a52; font-size:8px; letter-spacing:1px; }
 .power-val  { font-size:14px; font-weight:bold; color:#cc88ff; }
@@ -465,19 +465,39 @@ canvas#c { display:block; cursor:crosshair; }
         <div class="power-block-title">⚡ RECEIVED SIGNAL POWER</div>
         <div class="power-grid">
             <div class="power-cell">
-                <span class="power-lbl">OWN ← ENEMY</span>
-                <span class="power-val" id="pwrOwn">—</span>
-                <span class="power-unit">dBm (relative)</span>
-            </div>
-            <div class="power-cell">
                 <span class="power-lbl">RANGE</span>
                 <span class="power-val" id="pwrRange">—</span>
                 <span class="power-unit">km</span>
             </div>
             <div class="power-cell">
-                <span class="power-lbl">POWER LAW</span>
-                <span class="power-val" id="pwrLaw">1/R²</span>
-                <span class="power-unit">inverse square</span>
+                <span class="power-lbl">POWER</span>
+                <span class="power-val" id="pwrOwn">—</span>
+                <span class="power-unit">dBm</span>
+            </div>
+            <div class="power-cell">
+                <span class="power-lbl">DWELL</span>
+                <span class="power-val" id="ui_dwell">—</span>
+                <span class="power-unit">ms</span>
+            </div>
+            <div class="power-cell">
+                <span class="power-lbl">REVISIT</span>
+                <span class="power-val" id="ui_revisit">—</span>
+                <span class="power-unit">s</span>
+            </div>
+            <div class="power-cell">
+                <span class="power-lbl">FREQ</span>
+                <span class="power-val" id="ui_freq">—</span>
+                <span class="power-unit">GHz</span>
+            </div>
+            <div class="power-cell">
+                <span class="power-lbl">PRI</span>
+                <span class="power-val" id="ui_pri">—</span>
+                <span class="power-unit">ms</span>
+            </div>
+            <div class="power-cell">
+                <span class="power-lbl">PW</span>
+                <span class="power-val" id="ui_pw">—</span>
+                <span class="power-unit">µs</span>
             </div>
         </div>
         <!-- Power bar: full = max power (enemy very close), empty = weak signal -->
