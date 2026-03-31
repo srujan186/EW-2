@@ -1281,8 +1281,19 @@ function updatePowerDisplay(sepKm) {
     const norm = powerNorm(p);
 
     // Main power readout
-    document.getElementById('pwrOwn').textContent   = pDbm.toFixed(1) + ' dBm';
+// Main power readout
+    document.getElementById('pwrOwn').textContent   = pDbm.toFixed(1);
     document.getElementById('pwrRange').textContent = sepKm.toFixed(1);
+
+    // Dynamic EW Parameters
+    let isTracking = sepKm < 80; 
+    let noise = (Math.random() * 0.1) - 0.05;
+
+    document.getElementById('ui_dwell').textContent = ((isTracking ? 25.0 : 12.5) + (noise * 10)).toFixed(1);
+    document.getElementById('ui_revisit').textContent = (isTracking ? 0.5 : 2.0).toFixed(1);
+    document.getElementById('ui_freq').textContent = (9.5 + noise).toFixed(2);
+    document.getElementById('ui_pri').textContent = ((isTracking ? 0.50 : 1.25) + (noise * 0.1)).toFixed(2);
+    document.getElementById('ui_pw').textContent = ((isTracking ? 5.0 : 15.0) + (noise * 2)).toFixed(1);
 
     // Power bar
     const barPct = (norm * 100).toFixed(1);
