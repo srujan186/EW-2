@@ -1183,15 +1183,46 @@ let logData       = [];       // array of log line strings
 let logSecCounter = 0;        // frames since last log entry
 let logTotalSec   = 0;        // total seconds logged
 
-function startLog() {
-    logData=[]; logSecCounter=0; logTotalSec=0;
-    logRecording=true;
-    const btn=document.getElementById('logStartBtn');
-    btn.textContent='⏹ STOP LOG'; btn.classList.add('recording');
-    document.getElementById('logDlBtn').disabled=true;
-    const threatHeaders=threats.map(th=>`T${th.id}_range_km\tT${th.id}_power_dBm`).join('\t');
-    const header=`t_sec\town_lat\town_lon\ten_lat\ten_lon\town_dist_km\ten_dist_km\town_spd_kmh\ten_spd_kmh\trange_km\tpower_dBm`+(threatHeaders?'\t'+threatHeaders:'');
-    logData.push(header);
+function recordLogEntry() {
+    const interval = parseInt(document.getElementById('logInterval').value) || 1;
+    const tSec = logTotalSec * interval; 
+
+    const sepKm = deltaKm(own.lat, own.lon, en.lat, en.lon);
+    const p     = calcPower(sepKm);
+    const pDbm  = powerTodBm(p);
+    const ownKmh = mission.own.armed && !mission.own.done ? mission.own.speedKmh
+                 : own.spd * KM_DEG * FPS * 3600 * (own.moving ? 1 : 0);
+    const enKmh  = mission.en.armed  && !mission.en.done  ? mission.en.speedKmh
+                 : en.spd  * KM_DEG * FPS * 3600 * (en.moving  ? 1 : 0);
+
+    let isTracking = sepKm < 80;
+    let noise = (Math.random() * 0.1) - 0.05;
+    let dwell_ms = ((isTracking ? 25.0 : 12.5) + (noise * 10)).toFixed(1);
+    let revisit_s = (isTracking ? 0.5 : 2.0).toFixed(1);
+    let freq_GHz = (9.5 + noise).toFixed(2);
+    let pri_ms = ((isTracking ? 0.50 : 1.25) + (noise * 0.1)).toFixed(2);
+    let pw_us = ((isTracking ? 5.0 : 15.0) + (noise * 2)).toFixed(1);
+
+    const threatCols = threats.map(th => {
+        const tLat = th.motionMode==='dynamic' && th._pos ? th._pos.lat : th.lat;
+        const tLon = th.motionMode==='dynamic' && th._pos ? th._pos.lon : th.lon;
+        const tRange = deltaKm(own.lat, own.lon, tLat, tLon);
+        const tPower = powerTodBm(calcPower(tRange));
+        return `${tRange.toFixed(3)}\t${tPower.toFixed(2)}`;
+    }).join('\t');
+
+    const line = `${tSec}\t`
+               + `${own.lat.toFixed(5)}\t${own.lon.toFixed(5)}\t`
+               + `${en.lat.toFixed(5)}\t${en.lon.toFixed(5)}\t`
+               + `${stats.own.odometer.toFixed(3)}\t${stats.en.odometer.toFixed(3)}\t`
+               + `${ownKmh.toFixed(1)}\t${enKmh.toFixed(1)}\t`
+               + `${sepKm.toFixed(3)}\t${pDbm.toFixed(2)}\t`
+               + `${dwell_ms}\t${revisit_s}\t${freq_GHz}\t${pri_ms}\t${pw_us}`
+               + (threatCols ? '\t'+threatCols : '');
+
+    logData.push(line);
+    logTotalSec++;
+
     updateLogPreview();
 }
 
