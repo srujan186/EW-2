@@ -175,7 +175,7 @@ canvas#c { display:block; cursor:crosshair; }
     color:#cc88ff; margin-bottom:8px; padding-bottom:5px;
     border-bottom:1px solid #1a0a2e;
 }
-.power-grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:6px; }
+.power-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; }
 .power-cell { display:flex; flex-direction:column; gap:2px; }
 .power-lbl  { color:#2a1a52; font-size:8px; letter-spacing:1px; }
 .power-val  { font-size:14px; font-weight:bold; color:#cc88ff; }
@@ -465,39 +465,19 @@ canvas#c { display:block; cursor:crosshair; }
         <div class="power-block-title">⚡ RECEIVED SIGNAL POWER</div>
         <div class="power-grid">
             <div class="power-cell">
+                <span class="power-lbl">OWN ← ENEMY</span>
+                <span class="power-val" id="pwrOwn">—</span>
+                <span class="power-unit">dBm (relative)</span>
+            </div>
+            <div class="power-cell">
                 <span class="power-lbl">RANGE</span>
                 <span class="power-val" id="pwrRange">—</span>
                 <span class="power-unit">km</span>
             </div>
             <div class="power-cell">
-                <span class="power-lbl">POWER</span>
-                <span class="power-val" id="pwrOwn">—</span>
-                <span class="power-unit">dBm</span>
-            </div>
-            <div class="power-cell">
-                <span class="power-lbl">DWELL</span>
-                <span class="power-val" id="ui_dwell">—</span>
-                <span class="power-unit">ms</span>
-            </div>
-            <div class="power-cell">
-                <span class="power-lbl">REVISIT</span>
-                <span class="power-val" id="ui_revisit">—</span>
-                <span class="power-unit">s</span>
-            </div>
-            <div class="power-cell">
-                <span class="power-lbl">FREQ</span>
-                <span class="power-val" id="ui_freq">—</span>
-                <span class="power-unit">GHz</span>
-            </div>
-            <div class="power-cell">
-                <span class="power-lbl">PRI</span>
-                <span class="power-val" id="ui_pri">—</span>
-                <span class="power-unit">ms</span>
-            </div>
-            <div class="power-cell">
-                <span class="power-lbl">PW</span>
-                <span class="power-val" id="ui_pw">—</span>
-                <span class="power-unit">µs</span>
+                <span class="power-lbl">POWER LAW</span>
+                <span class="power-val" id="pwrLaw">1/R²</span>
+                <span class="power-unit">inverse square</span>
             </div>
         </div>
         <!-- Power bar: full = max power (enemy very close), empty = weak signal -->
@@ -597,9 +577,12 @@ const THREAT_TYPES  = ['search','track','trackWhileScan','acquisition','missile'
 const THREAT_LABELS = { search:'Search (□)', track:'Track (△)', trackWhileScan:'TWS (◇)', acquisition:'Acquisition (✱)', missile:'Missile (⊕)', unknown:'Unknown (#)' };
 const THREAT_SYMBOLS= { search:'□', track:'△', trackWhileScan:'◇', acquisition:'✱', missile:'⊕', unknown:'#' };
 const PRESETS = {
-    search:{angle:30,range:80,pages:2}, track:{angle:20,range:100,pages:1},
-    trackWhileScan:{angle:10,range:80,pages:1}, acquisition:{angle:55,range:80,pages:2},
-    missile:{angle:10,range:50,pages:1}, unknown:{angle:180,range:50,pages:1}
+    search:        { angle:30,  range:80,  pages:2, freq:3000,  pri:3000, pw:3.0,  dwell:2.0,  revisit:12.0 },
+    track:         { angle:20,  range:100, pages:1, freq:9500,  pri:1000, pw:1.0,  dwell:0.5,  revisit:1.0  },
+    trackWhileScan:{ angle:10,  range:80,  pages:1, freq:10000, pri:800,  pw:0.5,  dwell:0.3,  revisit:2.0  },
+    acquisition:   { angle:55,  range:80,  pages:2, freq:5600,  pri:2000, pw:2.0,  dwell:1.5,  revisit:5.0  },
+    missile:       { angle:10,  range:50,  pages:1, freq:16000, pri:500,  pw:0.1,  dwell:0.1,  revisit:0.5  },
+    unknown:       { angle:180, range:50,  pages:1, freq:7000,  pri:1500, pw:1.5,  dwell:1.0,  revisit:8.0  }
 };
 
 // Threats store their position in lat/lon (placed on the world map)
@@ -625,11 +608,17 @@ function initThreats() {
             scanAngle: p.angle,
             range: p.range,
             numPages: p.pages,
+            // EW parameters
+            frequency:  p.freq,     // MHz
+            pri:        p.pri,      // µs  — Pulse Repetition Interval
+            pw:         p.pw,       // µs  — Pulse Width
+            dwellTime:  p.dwell,    // s   — time beam stays on target
+            revisitTime:p.revisit,  // s   — time between revisits
             motionMode: 'static',
-            // Mission-based movement (lat/lon start→end)
             startLat: lat,      startLon: lon,
             endLat:   lat+1,    endLon:   lon+1,
             speedKmh: 400,
+            trajectory: 'straight',
             _t: 0, _mArmed: false, _mDone: false,
             totalDistKm: 0, totalRealSec: 0, elapsedSec: 0,
             trail: [], _pos: null,
@@ -675,6 +664,26 @@ function createThreatUI() {
         <input type="number" min="0" max="180" value="${th.scanAngle}" step="1" onchange="setTF(${i},'scanAngle',+this.value)"></div>
     <div class="control-group"><label>RANGE (km)</label>
         <input type="number" min="20" max="200" value="${th.range}" step="10" onchange="setTF(${i},'range',+this.value)"></div>
+    <div class="traj-panel" style="border-color:#1a3a52;">
+        <div class="traj-panel-title" style="color:#00ccff;">📡 EW PARAMETERS</div>
+        <div class="row2">
+            <div class="control-group"><label>FREQUENCY (MHz)</label>
+                <input type="number" min="100" max="100000" step="50" value="${th.frequency}" onchange="setTF(${i},'frequency',+this.value)"></div>
+            <div class="control-group"><label>PRI (µs)</label>
+                <input type="number" min="10" max="100000" step="10" value="${th.pri}" onchange="setTF(${i},'pri',+this.value)"></div>
+        </div>
+        <div class="row2">
+            <div class="control-group"><label>PW — Pulse Width (µs)</label>
+                <input type="number" min="0.01" max="1000" step="0.1" value="${th.pw}" onchange="setTF(${i},'pw',+this.value)"></div>
+            <div class="control-group"><label>DWELL TIME (s)</label>
+                <input type="number" min="0.01" max="60" step="0.1" value="${th.dwellTime}" onchange="setTF(${i},'dwellTime',+this.value)"></div>
+        </div>
+        <div class="control-group"><label>REVISIT TIME (s)</label>
+            <input type="number" min="0.1" max="300" step="0.5" value="${th.revisitTime}" onchange="setTF(${i},'revisitTime',+this.value)"></div>
+        <div style="font-size:8px;color:#1a3a52;margin-top:4px;line-height:1.6;">
+            DC = PW/PRI &nbsp;|&nbsp; PRF = 1/PRI &nbsp;|&nbsp; Band: ${getFreqBand(th.frequency)}
+        </div>
+    </div>
     <div class="traj-panel">
         <div class="traj-panel-title">⬡ MOTION</div>
         <div class="control-group"><label>MODE</label>
@@ -732,8 +741,11 @@ window.clearThreatTrail = i => { threats[i].trail=[]; threats[i]._t=0; threats[i
 window.setThreatType = (i, type) => {
     threats[i].threatType = type;
     const p = PRESETS[type];
-    if (threats[i].motionMode === 'static') { threats[i].scanAngle=p.angle; threats[i].range=p.range; threats[i].numPages=p.pages; }
+    threats[i].scanAngle=p.angle; threats[i].range=p.range; threats[i].numPages=p.pages;
+    threats[i].frequency=p.freq; threats[i].pri=p.pri; threats[i].pw=p.pw;
+    threats[i].dwellTime=p.dwell; threats[i].revisitTime=p.revisit;
     document.getElementById(`th-title-${i}`).textContent = `T${threats[i].id} — ${type.toUpperCase()} ${THREAT_SYMBOLS[type]}`;
+    createThreatUI(); // rebuild UI to reflect new preset values
 };
 window.setThreatMode = (i, m) => {
     threats[i].motionMode=m; threats[i]._t=0; threats[i].trail=[]; threats[i]._pos=null;
@@ -1151,6 +1163,31 @@ let paused = false;
 const P0 = 1.0;          // reference power at 1 km
 const P_REF = P0 / (RADAR_KM * RADAR_KM);  // power at max range
 
+// ── Frequency band lookup ──
+function getFreqBand(mhz) {
+    if (mhz <   300) return 'HF/VHF';
+    if (mhz <  1000) return 'UHF';
+    if (mhz <  2000) return 'L-Band';
+    if (mhz <  4000) return 'S-Band';
+    if (mhz <  8000) return 'C-Band';
+    if (mhz < 12000) return 'X-Band';
+    if (mhz < 18000) return 'Ku-Band';
+    if (mhz < 27000) return 'K-Band';
+    if (mhz < 40000) return 'Ka-Band';
+    return 'mm-Wave';
+}
+
+// ── Derived EW calculations ──
+function calcDutyCycle(pw, pri) {
+    return pri > 0 ? (pw / pri) * 100 : 0; // %
+}
+function calcPRF(pri) {
+    return pri > 0 ? (1e6 / pri).toFixed(1) : '—'; // Hz  (1e6 because PRI is in µs)
+}
+function calcBandwidth(pw) {
+    return pw > 0 ? (1000 / pw).toFixed(2) : '—'; // MHz  (approx: B ≈ 1/PW)
+}
+
 function calcPower(rangeKm) {
     // Clamp range to avoid division by zero
     const r = Math.max(0.5, rangeKm);
@@ -1183,46 +1220,17 @@ let logData       = [];       // array of log line strings
 let logSecCounter = 0;        // frames since last log entry
 let logTotalSec   = 0;        // total seconds logged
 
-function recordLogEntry() {
-    const interval = parseInt(document.getElementById('logInterval').value) || 1;
-    const tSec = logTotalSec * interval; 
-
-    const sepKm = deltaKm(own.lat, own.lon, en.lat, en.lon);
-    const p     = calcPower(sepKm);
-    const pDbm  = powerTodBm(p);
-    const ownKmh = mission.own.armed && !mission.own.done ? mission.own.speedKmh
-                 : own.spd * KM_DEG * FPS * 3600 * (own.moving ? 1 : 0);
-    const enKmh  = mission.en.armed  && !mission.en.done  ? mission.en.speedKmh
-                 : en.spd  * KM_DEG * FPS * 3600 * (en.moving  ? 1 : 0);
-
-    let isTracking = sepKm < 80;
-    let noise = (Math.random() * 0.1) - 0.05;
-    let dwell_ms = ((isTracking ? 25.0 : 12.5) + (noise * 10)).toFixed(1);
-    let revisit_s = (isTracking ? 0.5 : 2.0).toFixed(1);
-    let freq_GHz = (9.5 + noise).toFixed(2);
-    let pri_ms = ((isTracking ? 0.50 : 1.25) + (noise * 0.1)).toFixed(2);
-    let pw_us = ((isTracking ? 5.0 : 15.0) + (noise * 2)).toFixed(1);
-
-    const threatCols = threats.map(th => {
-        const tLat = th.motionMode==='dynamic' && th._pos ? th._pos.lat : th.lat;
-        const tLon = th.motionMode==='dynamic' && th._pos ? th._pos.lon : th.lon;
-        const tRange = deltaKm(own.lat, own.lon, tLat, tLon);
-        const tPower = powerTodBm(calcPower(tRange));
-        return `${tRange.toFixed(3)}\t${tPower.toFixed(2)}`;
-    }).join('\t');
-
-    const line = `${tSec}\t`
-               + `${own.lat.toFixed(5)}\t${own.lon.toFixed(5)}\t`
-               + `${en.lat.toFixed(5)}\t${en.lon.toFixed(5)}\t`
-               + `${stats.own.odometer.toFixed(3)}\t${stats.en.odometer.toFixed(3)}\t`
-               + `${ownKmh.toFixed(1)}\t${enKmh.toFixed(1)}\t`
-               + `${sepKm.toFixed(3)}\t${pDbm.toFixed(2)}\t`
-               + `${dwell_ms}\t${revisit_s}\t${freq_GHz}\t${pri_ms}\t${pw_us}`
-               + (threatCols ? '\t'+threatCols : '');
-
-    logData.push(line);
-    logTotalSec++;
-
+function startLog() {
+    logData=[]; logSecCounter=0; logTotalSec=0;
+    logRecording=true;
+    const btn=document.getElementById('logStartBtn');
+    btn.textContent='⏹ STOP LOG'; btn.classList.add('recording');
+    document.getElementById('logDlBtn').disabled=true;
+    const threatHeaders=threats.map(th=>
+        `T${th.id}_range_km\tT${th.id}_power_dBm\tT${th.id}_freq_MHz\tT${th.id}_pri_us\tT${th.id}_pw_us\tT${th.id}_dwell_s\tT${th.id}_revisit_s\tT${th.id}_dc_pct\tT${th.id}_prf_hz\tT${th.id}_band`
+    ).join('\t');
+    const header=`t_sec\town_lat\town_lon\ten_lat\ten_lon\town_dist_km\ten_dist_km\town_spd_kmh\ten_spd_kmh\trange_km\tpower_dBm`+(threatHeaders?'\t'+threatHeaders:'');
+    logData.push(header);
     updateLogPreview();
 }
 
@@ -1251,13 +1259,16 @@ function recordLogEntry() {
     const enKmh  = mission.en.armed  && !mission.en.done  ? mission.en.speedKmh
                  : en.spd  * KM_DEG * FPS * 3600 * (en.moving  ? 1 : 0);
 
-    // Per-threat range and power
+    // Per-threat range, power and EW parameters
     const threatCols = threats.map(th => {
         const tLat = th.motionMode==='dynamic' && th._pos ? th._pos.lat : th.lat;
         const tLon = th.motionMode==='dynamic' && th._pos ? th._pos.lon : th.lon;
         const tRange = deltaKm(own.lat, own.lon, tLat, tLon);
         const tPower = powerTodBm(calcPower(tRange));
-        return `${tRange.toFixed(3)}\t${tPower.toFixed(2)}`;
+        const dc  = calcDutyCycle(th.pw, th.pri).toFixed(2);
+        const prf = calcPRF(th.pri);
+        const band= getFreqBand(th.frequency);
+        return `${tRange.toFixed(3)}\t${tPower.toFixed(2)}\t${th.frequency}\t${th.pri}\t${th.pw}\t${th.dwellTime}\t${th.revisitTime}\t${dc}\t${prf}\t${band}`;
     }).join('\t');
 
     const line = `${tSec}\t`
@@ -1312,19 +1323,8 @@ function updatePowerDisplay(sepKm) {
     const norm = powerNorm(p);
 
     // Main power readout
-// Main power readout
-    document.getElementById('pwrOwn').textContent   = pDbm.toFixed(1);
+    document.getElementById('pwrOwn').textContent   = pDbm.toFixed(1) + ' dBm';
     document.getElementById('pwrRange').textContent = sepKm.toFixed(1);
-
-    // Dynamic EW Parameters
-    let isTracking = sepKm < 80; 
-    let noise = (Math.random() * 0.1) - 0.05;
-
-    document.getElementById('ui_dwell').textContent = ((isTracking ? 25.0 : 12.5) + (noise * 10)).toFixed(1);
-    document.getElementById('ui_revisit').textContent = (isTracking ? 0.5 : 2.0).toFixed(1);
-    document.getElementById('ui_freq').textContent = (9.5 + noise).toFixed(2);
-    document.getElementById('ui_pri').textContent = ((isTracking ? 0.50 : 1.25) + (noise * 0.1)).toFixed(2);
-    document.getElementById('ui_pw').textContent = ((isTracking ? 5.0 : 15.0) + (noise * 2)).toFixed(1);
 
     // Power bar
     const barPct = (norm * 100).toFixed(1);
@@ -1365,10 +1365,27 @@ function updatePowerDisplay(sepKm) {
         const tDbm = powerTodBm(tp);
         const tn   = powerNorm(tp);
         const hue2 = Math.round(120*(1-tn));
-        return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">
-            <span style="color:${th.color};font-weight:bold;">T${th.id} ${th.threatType.toUpperCase()}</span>
-            <span style="color:#664488;">${rKm.toFixed(1)} km</span>
-            <span style="color:hsl(${hue2},80%,60%);font-weight:bold;">${tDbm.toFixed(1)} dBm</span>
+        const dc   = calcDutyCycle(th.pw, th.pri).toFixed(2);
+        const prf  = calcPRF(th.pri);
+        const bw   = calcBandwidth(th.pw);
+        const band = getFreqBand(th.frequency);
+        return `<div style="background:#06080f;border:1px solid #1a0a2e;border-radius:4px;padding:6px 8px;margin-bottom:6px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;border-bottom:1px solid #1a0a2e;padding-bottom:4px;">
+                <span style="color:${th.color};font-weight:bold;font-size:10px;">T${th.id} — ${th.threatType.toUpperCase()}</span>
+                <span style="color:hsl(${hue2},80%,60%);font-weight:bold;font-size:11px;">${tDbm.toFixed(1)} dBm</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px;font-size:8px;">
+                <div><span style="color:#443355;">RANGE</span><br><span style="color:#cc88ff;">${rKm.toFixed(1)} km</span></div>
+                <div><span style="color:#443355;">FREQ</span><br><span style="color:#00ccff;">${th.frequency} MHz</span></div>
+                <div><span style="color:#443355;">BAND</span><br><span style="color:#00ccff;">${band}</span></div>
+                <div><span style="color:#443355;">PRI</span><br><span style="color:#ffcc44;">${th.pri} µs</span></div>
+                <div><span style="color:#443355;">PRF</span><br><span style="color:#ffcc44;">${prf} Hz</span></div>
+                <div><span style="color:#443355;">PW</span><br><span style="color:#ffcc44;">${th.pw} µs</span></div>
+                <div><span style="color:#443355;">DUTY CYCLE</span><br><span style="color:#ff8844;">${dc}%</span></div>
+                <div><span style="color:#443355;">DWELL</span><br><span style="color:#88ff44;">${th.dwellTime} s</span></div>
+                <div><span style="color:#443355;">REVISIT</span><br><span style="color:#88ff44;">${th.revisitTime} s</span></div>
+                <div><span style="color:#443355;">BW (est)</span><br><span style="color:#ff44cc;">${bw} MHz</span></div>
+            </div>
         </div>`;
     }).join('');
 }
