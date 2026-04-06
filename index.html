@@ -1042,7 +1042,12 @@ function drawThreatOnMap(th) {
 // Full crosshairs + scope circle + beam for each.
 // ═══════════════════════════════════════════════
 function drawThreatsInScope(ac, scopeCX, scopeCY, R) {
+    const isOwn = (ac === own);
     threats.forEach(th => {
+        // Only show threat in scope if it has been detected by this aircraft's sweep
+        const detected = isOwn ? th.detected_own : th.detected_en;
+        if (!detected) return;
+
         const {r,g,b} = hexRGB(th.color);
 
         // Get threat's current world lat/lon
