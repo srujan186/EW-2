@@ -402,14 +402,6 @@ canvas#c { display:block; cursor:crosshair; }
                 <option value="outbound">Outbound Arc</option>
             </select>
         </div>
-        <div class="endpoint-row">
-            <span class="ep-lbl" style="color:#dd0033;">〜 TRAJ</span>
-            <select id="enTraj" style="padding:3px 6px;background:#02030a;border:1px solid #dd003344;color:#ff4466;font-family:'Courier New',monospace;font-size:10px;border-radius:3px;">
-                <option value="straight">Straight</option>
-                <option value="scurve">S-Curve</option>
-                <option value="inbound">Inbound Arc</option>
-                <option value="outbound">Outbound Arc</option>
-            </select>
         </div>
         <div class="endpoint-row">
             <span class="ep-lbl" style="color:#dd0033;">⚡ SPEED</span>
@@ -1457,19 +1449,24 @@ function trajSCurve(sLat,sLon,eLat,eLon,t){
     }
 }
 function trajInbound(sLat,sLon,eLat,eLon,t){
-    // Arc curving toward the midpoint (bows inward toward centre of map)
+    // Quadratic bezier with control point offset PERPENDICULAR to the path
+    // perpendicular to (dLat,dLon) is (-dLon, dLat)
     const mLat=(sLat+eLat)/2, mLon=(sLon+eLon)/2;
     const dLat=eLat-sLat, dLon=eLon-sLon;
-    // ctrl point pushed toward centre (subtract half the span)
-    const ctrlLat=mLat-dLat*0.4, ctrlLon=mLon-dLon*0.4;
+    const len=Math.sqrt(dLat*dLat+dLon*dLon)||1;
+    // ctrl bows INWARD (left of travel direction)
+    const ctrlLat=mLat + (-dLon/len)*0.4*len;
+    const ctrlLon=mLon + ( dLat/len)*0.4*len;
     const u=1-t;
     return { lat:u*u*sLat+2*u*t*ctrlLat+t*t*eLat, lon:u*u*sLon+2*u*t*ctrlLon+t*t*eLon };
 }
 function trajOutbound(sLat,sLon,eLat,eLon,t){
-    // Arc curving away from midpoint (bows outward)
+    // ctrl bows OUTWARD (right of travel direction)
     const mLat=(sLat+eLat)/2, mLon=(sLon+eLon)/2;
     const dLat=eLat-sLat, dLon=eLon-sLon;
-    const ctrlLat=mLat+dLat*0.4, ctrlLon=mLon+dLon*0.4;
+    const len=Math.sqrt(dLat*dLat+dLon*dLon)||1;
+    const ctrlLat=mLat - (-dLon/len)*0.4*len;
+    const ctrlLon=mLon - ( dLat/len)*0.4*len;
     const u=1-t;
     return { lat:u*u*sLat+2*u*t*ctrlLat+t*t*eLat, lon:u*u*sLon+2*u*t*ctrlLon+t*t*eLon };
 }
